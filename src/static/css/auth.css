@@ -1,0 +1,117 @@
+
+
+body,html {
+    margin: 0;
+    padding: 0;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+
+h1, h2, h3,
+h4, h5, h6,
+p {
+    margin: 0;
+    padding: 0;
+}
+
+.auth-body {
+    height: 100vh;
+    display: flex; 
+    align-items: center;
+    justify-content: center;
+    background-color: #F6F8FF;
+}
+
+.auth-body .container {
+    justify-self: center;
+    text-align: center;
+    padding: 1.2rem;
+    border: 1px solid black;
+    border-radius: 10px;
+    background-color: #fafafa;
+    font-family: 'Tahoma Verdana Arial';
+}
+
+.container .title {
+    letter-spacing: 1.2px;
+
+}
+
+.container .hint {
+    margin: 0.5rem 0;
+    font-size: 17px;
+    font-style: italic;
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+.container .auth-form {
+    display: flex;
+    flex-direction: column;
+}
+
+.auth-form .input-box {
+    position: relative;
+}
+
+.input-box input {
+    padding: 0.75rem 0.5rem;
+    font-size: 18px;
+    border-color: #252525;
+    font-family: inherit;
+    letter-spacing: 1.1px;
+}
+.input-box input::placeholder {
+    font-style: italic;
+}
+
+.input-box:first-of-type input{
+    border-radius: 6px 6px 0 0;
+    border-bottom: none;
+}
+
+.input-box:last-of-type input {
+    border-radius: 0 0 6px 6px;
+}
+
+.input-box .input-icon {
+    width: 32px;
+    height: 32px;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    transition: all 0.2s;
+}
+
+.input-box .input-icon:hover {
+    cursor: pointer;
+    opacity: 0.8;
+}
+
+.input-box .icon-hide {
+    display: none;
+}
+
+.auth-form .btn-auth {
+    margin: 1rem 0;
+    padding: 1rem 0;
+    background-color: #fff;
+    border: 1px solid #252525;
+    border-radius: 8px;
+    font-size: 17px;
+    font-weight: 600;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.auth-form .btn-auth:hover {
+    cursor: pointer;
+    opacity: 0.75;
+}
+
+.auth-form .btn-auth:active {
+    transform: scale(0.99);
+}

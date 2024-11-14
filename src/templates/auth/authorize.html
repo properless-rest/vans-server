@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+        <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/shield.png') }}" />
+        <title>AUTH</title>
+    </head>
+
+    <body class="auth-body">
+        <div class="container">
+            <h1 class="title">AUTHORIZE</h1>
+            {% with messages = get_flashed_messages() %}
+            <div class="hint">
+                {% if messages %}
+                    {% for message in messages %}
+                        <p>{{ message }}</p>
+                    {% endfor %}
+                {% else %}   
+                    <p style="visibility: hidden;">X</p>
+                {% endif %}
+            </div>
+            {% endwith %}
+                
+            <form method="POST" class="auth-form">
+                <div class="input-box">
+                    <input type="text" name="username" placeholder="Username" required>
+                </div>
+                <div class="input-box">
+                    <input id="inputPW" type="password" name="password" placeholder="Password" required>
+                    <img id="iconShow" class="input-icon icon-reveal" src="{{ url_for('static', filename='icons/view.svg') }}"/>
+                    <img id="iconHide" class="input-icon icon-hide" src="{{ url_for('static', filename='icons/hide.svg') }}"/>
+
+                </div>
+                <button type="submit" class="btn-auth">Login</button>
+            </form>
+        </div>
+
+        <script>
+
+            function togglePWIcon() {
+                if (pwIsHidden) {
+                    inputType = "text"
+                    iconShowDisplay = "none"
+                    iconHideDisplay = "initial"
+                    pwIsHidden = !pwIsHidden
+                } else {
+                    inputType = "password"
+                    iconShowDisplay = "initial"
+                    iconHideDisplay = "none"
+                    pwIsHidden = !pwIsHidden
+                }
+                iconShow.style.display = iconShowDisplay
+                iconHide.style.display = iconHideDisplay
+                inputPW.setAttribute("type", inputType)
+            }
+
+            let pwIsHidden = true
+            let inputType
+            let iconShowDisplay
+            let iconHideDisplay
+            const iconShow = document.getElementById("iconShow")
+            const iconHide = document.getElementById("iconHide")
+            const inputPW = document.getElementById("inputPW")
+
+            iconShow.addEventListener("click", togglePWIcon)
+            iconHide.addEventListener("click", togglePWIcon)
+
+        </script>
+    </body>
+
+</html>
