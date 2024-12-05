@@ -65,6 +65,17 @@ db.sqlite3-journal
 instance/
 .webassets-cache
 
+# Ignore everything inside src/static/user and src/static/vans
+/src/static/user/*
+/src/static/vans/*
+
+# Exclude the .default subfolders from being ignored
+!/src/static/user/.default/
+/src/static/user/.default/*
+!/src/static/vans/.default/
+/src/static/vans/.default/*
+
+
 # Scrapy stuff:
 .scrapy
 

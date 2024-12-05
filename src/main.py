@@ -14,7 +14,7 @@ from PIL import Image
 from pytz import utc
 
 # project
-from config import app, bcrypt, db, executor, serializer, ProdConfig, SERVER_TIMEZONE
+from config import app, bcrypt, db, executor, serializer, SERVER_TIMEZONE
 from models import User, Van, Transaction, Review
 
 
@@ -32,11 +32,13 @@ def protect_admin():
 
 @app.route('/authorize', methods=['GET', 'POST'])
 def authorize():
+    if session.get('is_authorized'):
+        return redirect(('/admin'))  # Redirect to Flask-Admin
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         if username == app.config['ADMIN_USERNAME'] and password == app.config['ADMIN_PASSWORD']:
-            session['is_authorized'] = True  # Store the login state in the session
+            session.setdefault('is_authorized', True)  # Store the login state in the session
             return redirect(('/admin'))  # Redirect to Flask-Admin
         flash('Invalid credentials')
     return render_template('auth/authorize.html')  # this is for other methods (incl. 'GET')
@@ -44,37 +46,42 @@ def authorize():
 
 @app.route('/unauthorize')
 def unauthorize():
-    session.pop('is_authorized', None)  # Remove the 'is_logged_in' flag from the session
+    session.pop('is_authorized', False)  # Remove the 'is_logged_in' flag from the session
     return redirect(('/authorize'))
 
 
 # FLASK AUTOMATICALLY SERVES STATIC FILES, no custom view is needed
-# this one is for loading of the static files
+#
 # @app.route('/<path:static>')
 # def send_static(static):
 #     return current_app.send_static_file(f"{static}")
-
-
+#
+# cache static files
 @app.after_request
 def add_header(response):
     if request.path.startswith('/static'):
         response.headers['Cache-Control'] = 'public, max-age=604800'  # store static on FrontEnd for 1 week
     return response
+#
 
+
+def __send_email_on_signup(email, name, surname):
+    message = EmailMessage(
+        subject="VanLife: Successful Registration",
+        body=render_template("mail/registration.html", name=name, surname=surname),
+        from_email="vanlife@support.com",
+        to=[email]
+        )
+    message.content_subtype = "html"  # this must be set to send html, not plain text
+    try:
+        message.send()
+    except Exception as e:
+        return None  # don't break the registration process; just don't send an email
 
 # for pw reseting
 def __generate_reset_token(email):
     return serializer.dumps(email, salt=app.config['SALT'])
 
-
-# for pw reseting
-def __verify_reset_token(token, expiration=app.config['RESET_PW_TOKEN_EXP']):  # Expires in 15 min.
-    try:
-        email = serializer.loads(token, salt=app.config['SALT'], max_age=expiration)
-        return email
-    except Exception as e:
-        return None
-    
 
 def __validate_email(email):
     # WARNING: do NOT jsonify the dicts;
@@ -98,34 +105,6 @@ def __validate_email(email):
                }
     return None
 
-
-def __send_email_on_signup(email, name, surname):
-    message = EmailMessage(
-        subject="VanLife: Successful Registration",
-        body=render_template("mail/registration.html", name=name, surname=surname),
-        from_email="vanlife@support.com",
-        to=[email]
-        )
-    message.content_subtype = "html"  # this must be set to send html, not plain text
-    try:
-        message.send()
-    except Exception as e:
-        return None
-
-
-def __send_reset_email(email):
-    token = __generate_reset_token(email)
-    reset_url = f"{app.config['FRONTEND_URL']}/reset-password/{token}"
-    message = EmailMessage(
-        subject="VanLife: Password Reset Requested",
-        body=render_template("mail/change_email.html", reset_url=reset_url),
-        from_email="vanlife@support.com",
-        to=[email],
-    )
-    message.content_subtype = "html"
-    message.send()
-
-
 # in each of the methods below using `data = request.get_json()`
 # the arguement for data.get must correspond to the <input/ name="...">
 # from the FrontEnd side
@@ -144,12 +123,18 @@ def register():
     password = str(data.get('password')) if data.get("password") else None
     if not (name and surname and email and password):
         return jsonify(message="Required data missing", statusText="Required data missing"), 400
+    if len(name) > User.name_len:
+        return jsonify(message="Name is too long", statusText="name too long", nameErr=True), 400
+    if len(surname) > User.surname_len:
+        return jsonify(message="Surname is too long", statusText="surname too long", surnameErr=True), 400
+    if len(email) > User.email_len:
+        return jsonify(message="Email is too long", statusText="email too long", emailErr=True), 400
     email_invalid = __validate_email(email)
     # if the validation has failed, it returns a dict; jsonify and send it
     if email_invalid:
         return jsonify(email_invalid), 400
     if len(password) < 8:
-        return jsonify(message="Password must be at least 8\u00A0characters", statusText="Improper password", pwErr=True), 401
+        return jsonify(message="Password must be at least 8\u00A0characters", statusText="Improper password", pwErr=True), 400
     try:
         hashed_password = bcrypt.generate_password_hash(password).decode('utf-8')
     except Exception as e:
@@ -159,6 +144,7 @@ def register():
     try:
         db.session.add(new_user)
         db.session.commit()
+        # send email on registration
         executor.submit(__send_email_on_signup, email, name, surname)  # EXECUTOR WORKS IN A SEPARATE THREAD
         return jsonify(message="User registered", statusText="Creation successful"), 201
     except Exception as e:
@@ -181,6 +167,28 @@ def login():
         return jsonify(JWToken=JWToken, RFToken=RFToken, statusText="Login successful"), 200
     else:
         return jsonify(message="Wrong email or password", statusText="Login failed"), 401
+    
+
+    # for pw reseting
+def __verify_reset_token(token, expiration=app.config['RESET_PW_TOKEN_EXP']):  # Expires in 15 min.
+    try:
+        email = serializer.loads(token, salt=app.config['SALT'], max_age=expiration)
+        return email
+    except Exception as e:
+        return None
+
+
+def __send_reset_email(email):
+    token = __generate_reset_token(email)
+    reset_url = f"{app.config['FRONTEND_URL']}/reset-password/{token}"
+    message = EmailMessage(
+        subject="VanLife: Password Reset Requested",
+        body=render_template("mail/change_email.html", reset_url=reset_url),
+        from_email="vanlife@support.com",
+        to=[email],
+    )
+    message.content_subtype = "html"
+    message.send()
 
 
 @app.route("/sendReset", methods=["POST"])
@@ -198,13 +206,14 @@ def send_reset_email():
     return jsonify(message="Email sent", statusText="Email sent"), 200
 
 
+# for validation on routing to PW reset form (on the FrontEnd)
 @app.route('/validateToken', methods=['POST'])
 def validate_pw_reset_token():
     data = request.get_json()
     token = data.get('token', None)
     email = __verify_reset_token(token)
     if not email:
-        return jsonify(tokenValid=False), 200
+        return jsonify(tokenValid=False), 200  # DO not set to 4##; it must be in 2## and cause no errors on the Front
     # The token is valid, allow password reset
     return jsonify(tokenValid=True), 200
 
@@ -215,18 +224,18 @@ def reset_password():
     token = data.get('token', None)
     email = __verify_reset_token(token)
     if not email:
-        return jsonify(message="Cannot update password", statusText="Failed to update"), 400
+        return jsonify(message="Cannot update password", statusText="Failed to update"), 401
     relevant_user = User.query.filter_by(email=email).first()
     if not relevant_user:
-        return jsonify(message="User does not exist", statusText="Failed to update"), 400
+        return jsonify(message="User does not exist", statusText="Failed to update"), 404
     data = request.get_json()
     # no exception handling here; str is rarely non-convertable
     # str(None) yields a truthy "None", which is why ternary `if-statements` are used below
     new_password = str(data.get('newPassword')) if data.get('newPassword') else None
     if not new_password:
-        return jsonify(message="Enter your new password", statusText="Required data missing"), 401
+        return jsonify(message="Enter the new password", statusText="Required data missing"), 400
     if len(new_password) < 8:
-        return jsonify(message="Password must be at least 8\u00A0characters", statusText="Improper password"), 401
+        return jsonify(message="Password must be at least 8\u00A0characters", statusText="Improper password"), 400
     new_hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
     relevant_user.password = new_hashed_password
     try:
@@ -238,15 +247,16 @@ def reset_password():
 
 # for JWT REFRESHING
 @app.route("/refreshToken", methods=["POST"])
-@jwt_required(refresh=True)  # `refresh=True` allows only refresh tokens to access this route.
+@jwt_required(refresh=True)  # `refresh=True` allows only refresh tokens to access this route, not JWTs.
 def refresh():
     identity = get_jwt_identity()  # NO `EMAIL` key HERE!
     JWToken = create_access_token(identity=identity)
-    return jsonify(JWToken=JWToken)
+    return jsonify(JWToken=JWToken), 200
 
 
 @jwt_required()
 def __get_current_user():
+    # send in the header of the reuest:: Authentication: `Bearer <JWT>`
     try:
         logged_username = get_jwt_identity()['email']
     except Exception as e:
@@ -273,11 +283,11 @@ def upload_avatar():
     if not current_user:
         return jsonify(message="Not Authorized", statusText="Failed to read"), 401
     file = request.files['avatar']
-    file_extension = file.filename.rsplit(".")[-1]
     # imgMsg is for FrontEnd Profile Page form hints' differentiation
     if not file:
         return jsonify(message="No file detected", statusText="Invalid file", imgMsg=True), 400
-    if file.filename == "":
+    file_name, file_extension = file.filename.rsplit(".")
+    if file_name == "":
         return jsonify(message="Inadmissible file name", statusText="Invalid file name", imgMsg=True), 400
     if not file_extension in {"jpg", "jpeg", "png"}:
         return jsonify(message="Extension: .png, .jp(e)g", statusText="Invalid file", imgMsg=True), 400
@@ -329,6 +339,10 @@ def update_user():
     surname = str(data.get('surname')).strip().capitalize() if data.get('surname') else None
     if not (name and surname):
         return jsonify(message="Required data missing", statusText="Required data missing"), 400
+    if len(name) > User.name_len:
+        return jsonify(message="Name is too long", statusText="name too long"), 400
+    if len(surname) > User.surname_len:
+        return jsonify(message="Surname is too long", statusText="surname too long"), 400
     if current_user.name == name and current_user.surname == surname:
         return jsonify(message="No modifications detected", statusText="Data not altered", userMsg=True), 400
     current_user.name = name
@@ -353,9 +367,9 @@ def update_password():
         return jsonify(message="Curent password does not match", statusText="Password mismatch", passMsg=True), 401
     new_password = str(data.get('newPassword')) if data.get('newPassword') else None
     if not new_password:
-        return jsonify(message="Enter the new password", statusText="Failed to read", passMsg=True), 401
+        return jsonify(message="Enter the new password", statusText="Failed to read", passMsg=True), 400
     if len(new_password) < 8:
-        return jsonify(message="Password must be at least 8\u00A0characters", statusText="Improper password", passMsg=True), 401
+        return jsonify(message="Password must be at least 8\u00A0characters", statusText="Improper password", passMsg=True), 400
     new_hashed_password = bcrypt.generate_password_hash(new_password).decode('utf-8')
     current_user.password = new_hashed_password
     try:
@@ -376,7 +390,7 @@ def get_vans():
 def get_van(van_uuid):
     van = Van.query.filter_by(uuid=van_uuid).first()
     if not van:
-        return jsonify(message="Van does not exist", statusText="Failed to read"), 200
+        return jsonify(message="Van does not exist", statusText="Failed to read"), 200  # do not return 400; FrontEnd will break
     van_json = van.to_JSON()
     return jsonify(van=van_json, statusText="Read successful"), 200
 
@@ -390,11 +404,15 @@ def add_van():
     # no exception handling here; str is rarely non-convertable
     # str(None) yields a truthy "None", which is why ternary `if-statements` are used below
     name = str(data.get('name')).strip() if data.get('name') else None
-    description = str(data.get('description')).strip() if data.get('description') else None
     type = str(data.get('type')) if data.get('type') else None
+    description = str(data.get('description')).strip() if data.get('description') else None
     price_per_day = data.get('pricePerDay')
-    if not (name and description and type and price_per_day):
+    if not (name and type and description and price_per_day):
         return jsonify(message="Required data missing", statusText="Required data missing"), 400
+    if len(name) > Van.name_len:
+        return jsonify(message="Name is too long", statusText="Van name too long"), 400
+    if len(description) > Van.description_len:
+        return jsonify(message="Description is too long", statusText="Description too long"), 400
     if type not in ["Simple", "Rugged", "Luxury"]:
         return jsonify(message="Invalid Van type", statusText="Invalid input", dataMsg=True), 400
     try:
@@ -433,16 +451,13 @@ def upload_van_image():
         van = Van.query.filter_by(uuid=UUID(vanUUID)).first()  # UUID(vanUUID) is a UUID
     except Exception:
         return jsonify(message="Invalid UUID", statusText="Invalid UUID format"), 400
-    if not isinstance(vanUUID, str):
-        return jsonify(message="Invalid UUID", statusText="Invalid UUID"), 400
-    van = Van.query.filter_by(uuid=UUID(vanUUID)).first()  # UUID(vanUUID) is a UUID
     if not van:
-        return jsonify(message="The Van does not exist", statusText="Failed to read", imgMsg=True), 400
+        return jsonify(message="The Van does not exist", statusText="Failed to read", imgMsg=True), 404
     file = request.files.get('image')
-    file_extension = file.filename.rsplit(".")[-1]
     if not file:
         return jsonify(message="No file detected", statusText="Invalid file", imgMsg=True), 400
-    if file.filename == "":
+    file_name, file_extension = file.filename.rsplit(".")
+    if file_name == "":
         return jsonify(message="Inadmissible file name", statusText="Invalid file name", imgMsg=True), 400
     if not file_extension in {"jpg", "jpeg", "png"}:
         return jsonify(message="Extension: .png, .jp(e)g", statusText="Invalid file", imgMsg=True), 400
@@ -494,16 +509,20 @@ def update_van():
     except Exception:
         return jsonify(message="Invalid UUID", statusText="Invalid UUID format"), 400
     if not van:
-        return jsonify(message="The Van does not exist", statusText="Failed to read", dataMsg=True), 400
+        return jsonify(message="The Van does not exist", statusText="Failed to read", dataMsg=True), 404
     # no exception handling here; str is rarely non-convertable
     # str(None) yields a truthy "None", which is why ternary `if-statements` are used below
     # NOTE: don't capitalize(): van and description may have several capital words in them;
     name = str(data.get('name')).strip() if data.get('name') else None
+    type = data.get('type', None)
     description = data.get('description').strip() if data.get('description') else None
     price_per_day = data.get('pricePerDay', None)
-    type = data.get('type', None)
-    if not (name and description and type and price_per_day):
+    if not (name and type and description and price_per_day):
         return jsonify(message="Required data missing", statusText="Data is missing", dataMsg=True), 400
+    if len(name) > Van.name_len:
+        return jsonify(message="Name is too long", statusText="Van name too long"), 400
+    if len(description) > Van.description_len:
+        return jsonify(message="Description is too long", statusText="Description too long"), 400
     if type not in ["Simple", "Rugged", "Luxury"]:
         return jsonify(message="Invalid Van type", statusText="Wrong input", dataMsg=True), 400
     try:
@@ -535,7 +554,7 @@ def update_van():
         return jsonify(message="Server Error", statusText="Failed to update", dataMsg=True), 500
 
 
-@app.route('/deleteVan', methods=['POST'])
+@app.route('/deleteVan', methods=['DELETE'])
 def delete_van():
     current_user = __get_current_user()  # JWT protection is here
     if not current_user:
@@ -547,7 +566,7 @@ def delete_van():
     except Exception:
         return jsonify(message="Invalid UUID", statusText="Invalid UUID format"), 400
     if not van:
-        return jsonify(message="The Van does not exist", statusText="Failed to read"), 400
+        return jsonify(message="The Van does not exist", statusText="Failed to read"), 404
     van_static_folder = os.path.join(app.config['STATIC_FOLDER'], "vans", vanUUID)
     try:
         if os.path.exists(van_static_folder):
@@ -570,7 +589,7 @@ def make_transaction():
     except Exception:
         return jsonify(message="Invalid UUID", statusText="Invalid UUID format"), 400
     if not van:
-        return jsonify(message="The Van does not exist", statusText="Failed to read"), 400
+        return jsonify(message="The Van does not exist", statusText="Failed to read"), 404
     #
     # no exception handling here; str is rarely non-convertable
     # str(None) yields a truthy "None", which is why ternary `if-statements` are used below
@@ -581,6 +600,12 @@ def make_transaction():
     rent_expiration = data.get("rentExpiration", None)
     if not (lessee_name and lessee_surname and lessee_email and rent_commencement and rent_expiration):
         return jsonify(message="Required data missing", statusText="Missing Data"), 400
+    if len(lessee_name) > Transaction.name_len:
+        return jsonify(message="Name is too long", statusText="name too long"), 400
+    if len(lessee_surname) > Transaction.surname_len:
+        return jsonify(message="Surname is too long", statusText="surname too long"), 400
+    if len(lessee_email) > Transaction.email_len:
+        return jsonify(message="Email is too long", statusText="email too long"), 400
     if '@' not in lessee_email or \
       "." not in lessee_email.split('@')[-1]:
         return jsonify(message="Invalid email"), 400
@@ -598,18 +623,17 @@ def make_transaction():
     except Exception:
         return jsonify(message="Invalid date format", statusText="Inadmissible date"), 400
     tomorrow = datetime.now(SERVER_TIMEZONE).date() + timedelta(days=1)
-    print(rent_commencement, tomorrow)
     if rent_commencement < tomorrow:
         return jsonify(message="Inadmissible commencement date", statusText="Inadmissible date"), 400
     if rent_commencement >= rent_expiration:
-        return jsonify(message="Inadmissible date order", statusText="Inadmissible date"), 400
+        return jsonify(message="Inadmissible dates", statusText="Inadmissible date"), 400
     price = data.get("price", None)
     try:
         price = int(price)
     except (ValueError, TypeError):
         return jsonify(message="Invalid price", statusText="Invalid price"), 400
     if price < van.price_per_day or price < 1:
-        return jsonify(message="Wrong price", statusText="Invalid price"), 400
+        return jsonify(message="Invalid price", statusText="Invalid price"), 400
     if price > 2_000_000:
         # SQL INTEGER HAS A RENGE: -2,147,483,648 to 2,147,483,647; floor to 2 millions;
         return jsonify(message="Price too large", statusText="Invalid price"), 400
@@ -632,7 +656,7 @@ def make_transaction():
         db.session.add(transaction)
         db.session.commit()
         # NOTE: 'success' field is needed for redirecting inside MakeTransaction's loader
-        return jsonify(message="Transaction created", statusText="Create successful", success=True), 200
+        return jsonify(message="Transaction created", statusText="Create successful", success=True), 201
     except Exception:
         return jsonify(message="Server Error", statusText="Failed to delete"), 500
 
@@ -647,12 +671,16 @@ def make_review():
     except Exception:
         return jsonify(message="Invalid UUID", statusText="Invalid UUID format"), 400
     if not van:
-        return jsonify(message="The Van does not exist", statusText="Failed to read"), 400
+        return jsonify(message="The Van does not exist", statusText="Failed to read"), 404
     author = str(data.get("author")).strip() if data.get("author") else None # no capitalization here
     review = str(data.get("review")).strip() if data.get("review") else None
     rating = data.get("rating", None)  # the conversion is below
     if not (rating and author and review):
         return jsonify(message="Required data missing", statusText="Data missing"), 400
+    if len(author) > Review.author_len:
+        return jsonify(message="Author is too long", statusText="Author name too long"), 400
+    if len(review) > Review.text_len:
+        return jsonify(message="Review is too long", statusText="Review too long"), 400
     try:
         rating = int(rating)
     except (ValueError, TypeError):
@@ -673,7 +701,7 @@ def make_review():
         db.session.add(review)
         db.session.commit()
         # NOTE: 'success' field is needed for redirecting inside MakeReview's loader
-        return jsonify(message="Review created", statusText="Create successful", success=True), 200
+        return jsonify(message="Review created", statusText="Create successful", success=True), 201
     except Exception as e:
         print(e)
         return jsonify(message="Server Error", statusText="Failed to create"), 500

@@ -31,7 +31,6 @@ class Config:
     #
     SECRET_KEY = getenv("SECRET_KEY")
     SALT = getenv("SALT")
-    RESET_PW_TOKEN_EXP = 900  # THIS IS FOR PW RESET FORM: IN SECONDS
     #
     STATIC_FOLDER = "static"
     DEFAULT_USER_IMG = path.join("static", "user", ".default", "default.png")
@@ -41,11 +40,6 @@ class Config:
     ADMIN_USERNAME = getenv("ADMIN_USERNAME")
     ADMIN_PASSWORD = getenv("ADMIN_PASSWORD")
     #
-    # IN ProdConf:
-    # SQLALCHEMY_DATABASE_URI = "sqlite:///data.db"
-    # SQLALCHEMY_TRACK_MODIFICATIONS = False
-    #
-    # IN ProdConf:
     JWT_COOKIE_SECURE = True
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=14)
@@ -59,8 +53,12 @@ class Config:
 
 
 class ProdConfig(Config):
-    SQLALCHEMY_DATABASE_URI = "sqlite:///database.db"
+    SQLALCHEMY_DATABASE_URI = getenv("POSTGRESQL_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    #
+    STATIC_FOLDER = "static"
+    #
+    RESET_PW_TOKEN_EXP = 900  # THIS IS FOR PW RESET FORM: IN SECONDS = 15 min.
     #
     JWT_COOKIE_SECURE = True
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
@@ -70,48 +68,30 @@ class ProdConfig(Config):
 class TestConfig(Config):
     TESTING = True
     #
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_DATABASE_URI = getenv("POSTGRESQL_TEST")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    #
+    STATIC_FOLDER = "tests/testatic"
+    #
+    RESET_PW_TOKEN_EXP = 5  # THIS IS FOR PW RESET FORM: IN SECONDS
     #
     JWT_COOKIE_SECURE = False
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(seconds=5)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(minutes=1)
 
 
-# app.config['FRONTEND_URL'] = getenv("FRONTEND_URL")
-# #
-# app.config['SECRET_KEY'] = getenv("SECRET_KEY")
-# app.config['SALT'] = getenv("SALT")
-# app.config['RESET_PW_TOKEN_EXP'] = 900  # THIS IS FOR PW RESET FORM: IN SECONDS
-# #
-# app.config['STATIC_FOLDER'] = "static"
-# app.config['DEFAULT_USER_IMG'] = path.join("static", "user", ".default", "default.png")
-# app.config['DEFAULT_VANS_IMG'] = path.join("static", "vans", ".default", "default.jpg")
-# #
-# app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'  # a default theme for the ADMIN panel
-# app.config['ADMIN_USERNAME'] = getenv("ADMIN_USERNAME")
-# app.config['ADMIN_PASSWORD'] = getenv("ADMIN_PASSWORD")
-# #
-# app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///data.db"
-# app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-# #
-# app.config["JWT_COOKIE_SECURE"] = True
-# app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)
-# app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=14)
-# #
-# app.config['MAIL_SERVER'] = getenv("MAIL_SERVER")
-# app.config['MAIL_PORT'] = getenv("MAIL_PORT")
-# app.config['MAIL_USERNAME'] = getenv("MAIL_USERNAME")
-# app.config['MAIL_PASSWORD'] = getenv("MAIL_PASSWORD")
-# app.config['MAIL_USE_TLS'] = True
-# app.config['MAIL_USE_SSL'] = False
-# #
-
+# server timezone is imported into main; do not enclose it
 SERVER_TIMEZONE = timezone("Europe/Riga")
 
 CORS(app)  # cross-origin request
 
-app.config.from_object(ProdConfig)
+# if not Testing, apply prod settings, else - apply test settings
+# is testing, FLASK_ENV must be set to `test` to prevent loading prod settings in `config.py`
+# "FLASK_ENV" is set in `pytest.ini; `pip install pytest-env` is required for syntax construing`
+if getenv("FLASK_ENV") != "test":
+    app.config.from_object(ProdConfig)
+else:
+    app.config.from_object(TestConfig)
 
 
 admin = Admin(app, name="Vans", template_mode='bootstrap4')

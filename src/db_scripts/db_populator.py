@@ -1,3 +1,13 @@
+import sys
+
+from os.path import abspath, dirname
+
+print(sys.executable)
+
+# config, models and main will not be accessible
+# without adding `src` to the PYTHONPATH (on the line below)
+sys.path.insert(0, abspath(dirname(dirname(__file__))))
+
 from datetime import datetime, timedelta
 from uuid import uuid4
 
@@ -149,6 +159,7 @@ def seed_database():
         db.session.commit()
 
         print("Database seeded successfully with sample data.")
+
 
 if __name__ == "__main__":
     seed_database()
