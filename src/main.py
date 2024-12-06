@@ -50,11 +50,12 @@ def unauthorize():
     return redirect(('/authorize'))
 
 
-# FLASK AUTOMATICALLY SERVES STATIC FILES, no custom view is needed
+# FLASK AUTOMATICALLY SERVES STATIC FILES,
+# BUT PROD Servers like GUnicorn DO NOT
 #
-# @app.route('/<path:static>')
-# def send_static(static):
-#     return current_app.send_static_file(f"{static}")
+@app.route('/<path:static>')
+def send_static(static):
+    return current_app.send_static_file(f"{static}")
 #
 # cache static files
 @app.after_request

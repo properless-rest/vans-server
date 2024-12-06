@@ -53,7 +53,7 @@ class Config:
 
 
 class ProdConfig(Config):
-    SQLALCHEMY_DATABASE_URI = getenv("POSTGRESQL_URL")
+    SQLALCHEMY_DATABASE_URI = getenv("SQLITE_URL")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     #
     STATIC_FOLDER = "static"
