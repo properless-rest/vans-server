@@ -25,16 +25,11 @@ load_dotenv()
 app = Flask(__name__)  # instantiate flask app
 
 
-
 class Config:
     FRONTEND_URL = getenv("FRONTEND_URL")
     #
     SECRET_KEY = getenv("SECRET_KEY")
     SALT = getenv("SALT")
-    #
-    STATIC_FOLDER = "static"
-    DEFAULT_USER_IMG = path.join("static", "user", ".default", "default.png")
-    DEFAULT_VANS_IMG = path.join("static", "vans", ".default", "default.jpg")
     #
     FLASK_ADMIN_SWATCH = 'cerulean'  # a default theme for the ADMIN panel
     ADMIN_USERNAME = getenv("ADMIN_USERNAME")
@@ -53,10 +48,12 @@ class Config:
 
 
 class ProdConfig(Config):
-    SQLALCHEMY_DATABASE_URI = getenv("POSTGRESQL_URL")
+    SQLALCHEMY_DATABASE_URI = getenv("POSTGRESQL_URL")  # switch between SQLITE and POSTGRES in DEV
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     #
-    STATIC_FOLDER = "static"
+    STATIC_FOLDER = getenv("STATIC_FOLDER_DEV")
+    DEFAULT_USER_IMG = path.join(STATIC_FOLDER, "user", ".default", "default.png")
+    DEFAULT_VANS_IMG = path.join(STATIC_FOLDER, "vans", ".default", "default.jpg")
     #
     RESET_PW_TOKEN_EXP = 900  # THIS IS FOR PW RESET FORM: IN SECONDS = 15 min.
     #
@@ -68,10 +65,12 @@ class ProdConfig(Config):
 class TestConfig(Config):
     TESTING = True
     #
-    SQLALCHEMY_DATABASE_URI = getenv("POSTGRESQL_TEST")
+    SQLALCHEMY_DATABASE_URI = getenv("POSTGRESQL_TEST")  # switch between SQLITE and POSTGRES in DEV
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     #
-    STATIC_FOLDER = "tests/testatic"
+    STATIC_FOLDER = getenv("STATIC_FOLDER_TEST")
+    DEFAULT_USER_IMG = path.join(STATIC_FOLDER, "user", ".default", "default.png")
+    DEFAULT_VANS_IMG = path.join(STATIC_FOLDER, "vans", ".default", "default.jpg")
     #
     RESET_PW_TOKEN_EXP = 5  # THIS IS FOR PW RESET FORM: IN SECONDS
     #

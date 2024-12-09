@@ -12,9 +12,6 @@ from config import app, bcrypt, db, SERVER_TIMEZONE
 from models import User, Van, Transaction, Review
 import main  # import main to register all routes with the Flask app; the tests fail otherwise;
 
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
 
 @fixture(scope="module")
 def test_app():
@@ -81,7 +78,7 @@ def test_app():
         db.session.add_all([test_user, test_van1, test_van2, test_van3, test_trx, test_review])
         db.session.commit()
         print("Table data added.")
-        yield app  # yield the app as a fixture
+        yield app  # yield the app as a fixture; testing happens here;
         print("Closing up db session...")
         db.session.close() # ! CLOSE !BEFORE! dropping all the tables; PostgreSQL freezes `pytest` without this line
         print("Db session closed.")
@@ -101,6 +98,7 @@ def client(test_app):
     return test_app.test_client()
 
 
-@fixture
+@fixture(scope="module")
 def runner(test_app):
     return test_app.test_cli_runner()
+

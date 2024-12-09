@@ -14,7 +14,7 @@ from main import __generate_reset_token
 def test_register(client):
     # GET instead of POST
     response = client.get("/register")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # Empty JSON
     response = client.post("/register", json={})
     assert response.status_code == 400
@@ -56,7 +56,7 @@ def test_register(client):
 def test_login(client):
     # GET instead of POST
     response = client.get("/login")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # Empty JSON
     response = client.post("/login", json={})
     assert response.status_code == 400
@@ -108,7 +108,7 @@ def test_get_user(client):
 def test_send_reset_email(client):
     # GET instead of POST
     response = client.get("/sendReset")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # Empty JSON
     response = client.post("/sendReset", json={})
     assert response.status_code == 400
@@ -126,7 +126,7 @@ def test_send_reset_email(client):
 def test_validate_reset_token(client):
     # GET instead of POST
     response = client.get("/validateToken")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # No Token
     response = client.post("/validateToken", json={})
     assert response.status_code == 200
@@ -151,7 +151,7 @@ def test_validate_reset_token(client):
 def test_reset_pw(client):
     # GET instead of POST
     response = client.get("/resetPassword")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # No Token
     response = client.post("/resetPassword", json={})
     assert response.status_code == 401
@@ -197,7 +197,7 @@ def test_reset_pw(client):
 def test_refresh_JWT(client):
     # GET instead of POST
     response = client.get("/refreshToken")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # pre-requisites
     response = client.post("/login", json={"email": "name.surname@example.com", "password": "12345678"})
     assert response.status_code == 200
@@ -238,7 +238,7 @@ def test_upload_avatar(client):
     JWToken = response.json.get("JWToken")
     # GET instead of POST
     response = client.get("/uploadAvatar")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # no authorization headers
     response = client.post("/uploadAvatar", content_type="multipart/form-data")
     assert response.status_code == 401
@@ -309,7 +309,7 @@ def test_update_user(client):
     JWToken = response.json.get("JWToken")
     # GET instead of PATCH
     response = client.get("/updateUser")  # must PATCH
-    assert response.status_code == 405
+    assert response.status_code == 404
     # no authorization headers
     response = client.patch("/updateUser", json={})
     assert response.status_code == 401
@@ -373,7 +373,7 @@ def test_update_password(client):
     JWToken = response.json.get("JWToken")
     # GET instead of PATCH
     response = client.get("/updatePassword")  # must PATCH
-    assert response.status_code == 405
+    assert response.status_code == 404
     # no authorization headers
     response = client.patch("/updatePassword", json={})
     assert response.status_code == 401

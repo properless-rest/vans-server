@@ -44,7 +44,7 @@ def test_add_van(client):
     JWT = client.post("/login", json={"email": "name.surname@example.com", "password": "12345678"}).json.get("JWToken")
     # GET instead of POST
     response = client.get("/addVan")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # no Authorization header
     response = client.post("/addVan", json={})
     assert response.status_code == 401
@@ -126,7 +126,7 @@ def test_upload_image(client):
     van_uuid = Van.query.get(1).uuid
     # GET instead of POST
     response = client.get("/uploadVanImage")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # no Authorization header
     response = client.post("/uploadVanImage", data={})
     assert response.status_code == 401
@@ -217,7 +217,7 @@ def test_update_van(client):
     van_uuid = first_van.uuid
     # GET instead of PATCH
     response = client.get("/updateVan")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # no Authorization header
     response = client.patch("/updateVan", json={})
     assert response.status_code == 401

@@ -10,7 +10,7 @@ def test_make_trx(client):
     van_uuid = Van.query.get(1).uuid
     # GET instead of POST
     response = client.get("/makeTransaction")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # Inadmissible van UUID format
     response = client.post("/makeTransaction", json={"vanUUID": 1_234_567_890})
     assert response.status_code == 400
@@ -227,7 +227,7 @@ def test_make_review(client):
     van_uuid = van.uuid
     # GET instead of POST
     response = client.get("/makeReview")
-    assert response.status_code == 405
+    assert response.status_code == 404
     # Inadmissible van UUID format
     response = client.post("/makeReview", json={"vanUUID": 1_234_567_890})
     assert response.status_code == 400
